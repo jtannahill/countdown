@@ -80,10 +80,16 @@ final class EventKitService: ObservableObject, EventProviding {
 
     @objc func refresh() {
         let now = Date()
-        guard hasAccess else { nextEvent = nil; return }
+        guard hasAccess else { setNextEvent(nil); return }
         let end = Calendar.current.date(byAdding: .day, value: lookaheadDays, to: now) ?? now
         let events = upcomingEvents(from: now, to: end)
-        let resolved = NextEventResolver.soonestTimedEvent(in: events, now: now)
-        if resolved != nextEvent { nextEvent = resolved }
+        setNextEvent(NextEventResolver.soonestTimedEvent(in: events, now: now))
+    }
+
+    /// `.EKEventStoreChanged` can fire off the main thread; `nextEvent` drives
+    /// SwiftUI, so always publish it on the main thread.
+    private func setNextEvent(_ value: EventInfo?) {
+        let apply = { if self.nextEvent != value { self.nextEvent = value } }
+        if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
     }
 }
