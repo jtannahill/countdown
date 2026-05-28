@@ -30,4 +30,24 @@ final class ModelCodableTests: XCTestCase {
         XCTAssertEqual(back[0].eventLookaheadHours, 6)
         XCTAssertEqual(back[0].mode, .nextEvent)
     }
+
+    func testCalendarFieldsDefaultAndRoundTrip() throws {
+        // Legacy blob without the calendar fields decodes to defaults.
+        let legacy = """
+        [{"id":"E621E1F8-C36C-495A-93FC-0C247A3E6E5F","label":"EOD","mode":"fixed",
+          "targetTimestamp":12345,"color":"orange"}]
+        """.data(using: .utf8)!
+        let items = try JSONDecoder().decode([Countdown].self, from: legacy)
+        XCTAssertNil(items[0].calendarEventID)
+        XCTAssertEqual(items[0].eventDurationMinutes, 60)
+
+        // Round-trip preserves set values.
+        var c = Countdown(label: "Launch")
+        c.calendarEventID = "ABC-123"
+        c.eventDurationMinutes = 90
+        let data = try JSONEncoder().encode([c])
+        let back = try JSONDecoder().decode([Countdown].self, from: data)
+        XCTAssertEqual(back[0].calendarEventID, "ABC-123")
+        XCTAssertEqual(back[0].eventDurationMinutes, 90)
+    }
 }

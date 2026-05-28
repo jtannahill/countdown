@@ -82,6 +82,10 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
     // Next-event mode: how far ahead an event counts as "imminent" before falling back to EOD.
     var eventLookaheadHours: Int = 12
 
+    // Calendar write: identifier of the linked EKEvent (nil = not added) + its duration.
+    var calendarEventID: String? = nil
+    var eventDurationMinutes: Int = 60
+
     init(label: String = "EOD") {
         self.label = label
     }
@@ -89,6 +93,7 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, label, mode, resetHour, resetMinute, targetHour, targetMinute, targetTimestamp, color
         case alertOffsets, alertAtZero, eventLookaheadHours
+        case calendarEventID, eventDurationMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -105,6 +110,8 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
         alertOffsets = try c.decodeIfPresent([Int].self, forKey: .alertOffsets) ?? []
         alertAtZero = try c.decodeIfPresent(Bool.self, forKey: .alertAtZero) ?? false
         eventLookaheadHours = try c.decodeIfPresent(Int.self, forKey: .eventLookaheadHours) ?? 12
+        calendarEventID = try c.decodeIfPresent(String.self, forKey: .calendarEventID)
+        eventDurationMinutes = try c.decodeIfPresent(Int.self, forKey: .eventDurationMinutes) ?? 60
     }
 
     func currentTarget(now: Date = Date()) -> Date {
