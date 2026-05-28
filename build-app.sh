@@ -3,6 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Set to your Developer ID identity for reliable notifications, e.g.
+#   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+# Leave empty to fall back to ad-hoc signing (notifications may be unreliable).
+SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+
 echo "Building Countdown..."
 swift build -c release
 
@@ -49,12 +54,22 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <true/>
     <key>ATSApplicationFontsPath</key>
     <string>Fonts</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Countdown shows the time remaining until your next calendar event.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Countdown shows the time remaining until your next calendar event.</string>
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc sign so Gatekeeper allows it to run locally
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Sign the app — use Developer ID for reliable notifications, fall back to ad-hoc
+if [ -n "$SIGN_IDENTITY" ]; then
+    echo "Signing with: $SIGN_IDENTITY"
+    codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+else
+    echo "No SIGN_IDENTITY set — ad-hoc signing (notifications may be unreliable)."
+    codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+fi
 
 echo "Built $APP"
 echo ""
