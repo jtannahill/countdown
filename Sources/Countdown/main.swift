@@ -43,9 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let content = ContentView()
 
+        // No .resizable: OS edge-dragging would stretch the window independently
+        // of its content, leaving a black void. Resizing is done only via the
+        // in-app handle (WindowSizer.setUserScale), which scales content to fit.
         window = FloatingWindow(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 190),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
