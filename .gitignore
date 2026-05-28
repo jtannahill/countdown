@@ -1,0 +1,11 @@
+# Build artifacts
+.build/
+Countdown.app/
+*.swiftpm
+
+# Licensed fonts — not redistributable. Supply your own (see README).
+Resources/Fonts/*.ttf
+Resources/Fonts/*.otf
+
+# macOS
+.DS_Store
