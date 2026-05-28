@@ -48,11 +48,13 @@ enum TerminalColor: String, Codable, CaseIterable, Identifiable {
 enum CountdownMode: String, Codable, CaseIterable, Identifiable {
     case daily
     case fixed
+    case nextEvent
     var id: String { rawValue }
     var label: String {
         switch self {
         case .daily: return "Daily"
         case .fixed: return "Fixed date"
+        case .nextEvent: return "Next event"
         }
     }
 }
@@ -73,12 +75,20 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
 
     var color: TerminalColor = .orange
 
+    // Notifications: minutes-before thresholds; 0 is handled separately by alertAtZero.
+    var alertOffsets: [Int] = []
+    var alertAtZero: Bool = false
+
+    // Next-event mode: how far ahead an event counts as "imminent" before falling back to EOD.
+    var eventLookaheadHours: Int = 12
+
     init(label: String = "EOD") {
         self.label = label
     }
 
     enum CodingKeys: String, CodingKey {
         case id, label, mode, resetHour, resetMinute, targetHour, targetMinute, targetTimestamp, color
+        case alertOffsets, alertAtZero, eventLookaheadHours
     }
 
     init(from decoder: Decoder) throws {
@@ -92,13 +102,18 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
         targetMinute = try c.decodeIfPresent(Int.self, forKey: .targetMinute) ?? 30
         targetTimestamp = try c.decodeIfPresent(Double.self, forKey: .targetTimestamp) ?? Date().addingTimeInterval(86400 * 30).timeIntervalSince1970
         color = try c.decodeIfPresent(TerminalColor.self, forKey: .color) ?? .orange
+        alertOffsets = try c.decodeIfPresent([Int].self, forKey: .alertOffsets) ?? []
+        alertAtZero = try c.decodeIfPresent(Bool.self, forKey: .alertAtZero) ?? false
+        eventLookaheadHours = try c.decodeIfPresent(Int.self, forKey: .eventLookaheadHours) ?? 12
     }
 
     func currentTarget(now: Date = Date()) -> Date {
         switch mode {
         case .fixed:
             return Date(timeIntervalSince1970: targetTimestamp)
-        case .daily:
+        case .daily, .nextEvent:
+            // .nextEvent uses this only as its EOD fallback; the live event
+            // target is resolved by CountdownTarget (see Task 2 onward).
             let cal = Calendar.current
             var anchorComps = cal.dateComponents([.year, .month, .day], from: now)
             anchorComps.hour = resetHour
@@ -123,6 +138,8 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
             let f = DateFormatter()
             f.dateFormat = "EEE MMM d · h:mm a"
             return f.string(from: date).lowercased()
+        case .nextEvent:
+            return "next calendar event"
         }
     }
 }
