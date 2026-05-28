@@ -444,6 +444,7 @@ struct HUDView: View {
 struct SettingsView: View {
     @ObservedObject var store: CountdownStore
     @ObservedObject var settings: AppSettings
+    @State private var showingNewEvent = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -451,6 +452,7 @@ struct SettingsView: View {
                 Text("Countdowns")
                     .font(.system(size: 15, weight: .semibold))
                 Spacer()
+                Button { showingNewEvent = true } label: { Label("New event", systemImage: "calendar.badge.plus") }
                 Button { store.add() } label: { Label("Add", systemImage: "plus") }
             }
 
@@ -487,6 +489,9 @@ struct SettingsView: View {
         }
         .padding(22)
         .frame(width: 480)
+        .sheet(isPresented: $showingNewEvent) {
+            NewEventForm(store: store)
+        }
     }
 }
 
@@ -720,5 +725,62 @@ struct CountdownEditor: View {
                 item[keyPath: minutePath] = comps.minute ?? 0
             }
         )
+    }
+}
+
+struct NewEventForm: View {
+    @ObservedObject var store: CountdownStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = "New event"
+    @State private var start = Date().addingTimeInterval(3600)
+    @State private var durationMinutes = 60
+    @State private var note: String?
+    @State private var isCreating = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("New event").font(.system(size: 15, weight: .semibold))
+            TextField("Title", text: $title).textFieldStyle(.roundedBorder)
+            DatePicker("Start", selection: $start, displayedComponents: [.date, .hourAndMinute])
+            Stepper("Duration: \(durationLabel(durationMinutes))",
+                    value: $durationMinutes, in: 15...480, step: 15)
+            if let note {
+                Text(note).font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Create") { create() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
+    }
+
+    private func create() {
+        guard !isCreating else { return }   // ignore rapid double-taps
+        isCreating = true
+        note = nil
+        let t = title.trimmingCharacters(in: .whitespaces)
+        let s = start
+        let dur = durationMinutes
+        EventKitService.shared.createEvent(title: t, start: s, durationMinutes: dur) { newID in
+            guard let newID else {
+                note = EventKitService.shared.hasAccess
+                    ? "Couldn't save to Calendar."
+                    : "Calendar access denied — enable in System Settings ▸ Privacy ▸ Calendars"
+                isCreating = false
+                return
+            }
+            var c = Countdown(label: t)
+            c.mode = .fixed
+            c.targetTimestamp = s.timeIntervalSince1970
+            c.eventDurationMinutes = dur
+            c.calendarEventID = newID
+            store.items.append(c)
+            dismiss()
+        }
     }
 }
