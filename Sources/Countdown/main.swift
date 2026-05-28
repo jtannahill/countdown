@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ServiceManagement
+import Combine
 
 final class FloatingWindow: NSWindow {
     override var canBecomeKey: Bool { true }
@@ -39,6 +40,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: FloatingWindow!
+    private var cancellables = Set<AnyCancellable>()
+
+    private func rescheduleNotifications() {
+        let svc = EventKitService.shared
+        NotificationScheduler.shared.reschedule(
+            items: CountdownStore.shared.items,
+            nextEventStart: svc.nextEvent?.startDate,
+            nextEventTitle: svc.nextEvent?.title)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let content = ContentView()
@@ -81,6 +91,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.setActivationPolicy(.accessory)
         NSApp.activate(ignoringOtherApps: true)
+
+        EventKitService.shared.start()
+
+        // Reschedule notifications when items, the next event, or time (daily roll) change.
+        CountdownStore.shared.$items
+            .sink { [weak self] _ in self?.rescheduleNotifications() }
+            .store(in: &cancellables)
+        EventKitService.shared.$nextEvent
+            .sink { [weak self] _ in self?.rescheduleNotifications() }
+            .store(in: &cancellables)
+        let reschedTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            self?.rescheduleNotifications()
+        }
+        RunLoop.main.add(reschedTimer, forMode: .common)
+        rescheduleNotifications()
 
         registerLoginItem()
         MenuBarController.shared.refresh()
