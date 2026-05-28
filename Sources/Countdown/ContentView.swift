@@ -1,6 +1,15 @@
 import SwiftUI
 import AppKit
 
+/// "90" → "1h 30m", "45" → "45m", "120" → "2h". Shared by the calendar controls
+/// and the New event form.
+fileprivate func durationLabel(_ minutes: Int) -> String {
+    let h = minutes / 60, m = minutes % 60
+    if h == 0 { return "\(m)m" }
+    if m == 0 { return "\(h)h" }
+    return "\(h)h \(m)m"
+}
+
 struct ContentView: View {
     @StateObject private var store = CountdownStore.shared
     @ObservedObject private var settings = AppSettings.shared
@@ -484,6 +493,8 @@ struct SettingsView: View {
 struct CountdownEditor: View {
     @Binding var item: Countdown
     let onDelete: () -> Void
+    @State private var calendarNote: String?
+    @State private var isAddingEvent = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -549,6 +560,7 @@ struct CountdownEditor: View {
                     ),
                     displayedComponents: [.date, .hourAndMinute]
                 )
+                calendarControls
             } else {
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -645,6 +657,57 @@ struct CountdownEditor: View {
     private static let timeFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "EEE h:mm a"; return f
     }()
+
+    @ViewBuilder private var calendarControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Stepper("Duration: \(durationLabel(item.eventDurationMinutes))",
+                    value: $item.eventDurationMinutes, in: 15...480, step: 15)
+                .font(.system(size: 11))
+            HStack(spacing: 8) {
+                Button(item.calendarEventID == nil ? "Add to Calendar" : "Update Calendar event") {
+                    addOrUpdateCalendarEvent()
+                }
+                .buttonStyle(.bordered)
+                .disabled(isAddingEvent)
+                if item.calendarEventID != nil {
+                    Text("Added ✓").font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            if let calendarNote {
+                Text(calendarNote).font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func addOrUpdateCalendarEvent() {
+        guard !isAddingEvent else { return }   // ignore rapid double-taps
+        isAddingEvent = true
+        calendarNote = nil
+        let start = Date(timeIntervalSince1970: item.targetTimestamp)
+        let title = item.label
+        let dur = item.eventDurationMinutes
+        if let id = item.calendarEventID {
+            EventKitService.shared.updateEvent(id: id, title: title, start: start, durationMinutes: dur) { ok in
+                if ok { isAddingEvent = false } else { createAndLink(title: title, start: start, dur: dur) }
+            }
+        } else {
+            createAndLink(title: title, start: start, dur: dur)
+        }
+    }
+
+    private func createAndLink(title: String, start: Date, dur: Int) {
+        EventKitService.shared.createEvent(title: title, start: start, durationMinutes: dur) { newID in
+            if let newID {
+                item.calendarEventID = newID
+            } else {
+                calendarNote = EventKitService.shared.hasAccess
+                    ? "Couldn't save to Calendar."
+                    : "Calendar access denied — enable in System Settings ▸ Privacy ▸ Calendars"
+            }
+            isAddingEvent = false
+        }
+    }
 
     private func hmBinding(_ hourPath: WritableKeyPath<Countdown, Int>, _ minutePath: WritableKeyPath<Countdown, Int>) -> Binding<Date> {
         Binding(
