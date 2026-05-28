@@ -22,6 +22,13 @@ enum NextEventResolver {
     }
 }
 
+/// Pure helper for event end-time math — unit tested.
+enum EventDraft {
+    static func end(start: Date, durationMinutes: Int) -> Date {
+        start.addingTimeInterval(TimeInterval(durationMinutes * 60))
+    }
+}
+
 /// Live EventKit wrapper. Thin; not unit tested (verified by the manual smoke test).
 final class EventKitService: ObservableObject, EventProviding {
     static let shared = EventKitService()
@@ -91,5 +98,62 @@ final class EventKitService: ObservableObject, EventProviding {
     private func setNextEvent(_ value: EventInfo?) {
         let apply = { if self.nextEvent != value { self.nextEvent = value } }
         if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
+    }
+
+    /// Creates an event in the default calendar. Completion on the main thread with
+    /// the new event identifier, or nil on no-access / no-writable-calendar / save failure.
+    func createEvent(title: String, start: Date, durationMinutes: Int,
+                     completion: @escaping (String?) -> Void) {
+        withWriteAccess { granted in
+            guard granted, let cal = self.store.defaultCalendarForNewEvents else {
+                completion(nil); return
+            }
+            let event = EKEvent(eventStore: self.store)
+            event.title = title
+            event.startDate = start
+            event.endDate = EventDraft.end(start: start, durationMinutes: durationMinutes)
+            event.calendar = cal
+            do {
+                try self.store.save(event, span: .thisEvent)
+                // Refresh now rather than waiting for the .EKEventStoreChanged
+                // observer, so a newly imminent event shows up immediately.
+                self.refresh()
+                completion(event.eventIdentifier)
+            } catch {
+                completion(nil)
+            }
+        }
+    }
+
+    /// Updates a previously created event. Completion on the main thread: true if updated,
+    /// false if the event no longer exists (caller should re-create and relink).
+    func updateEvent(id: String, title: String, start: Date, durationMinutes: Int,
+                     completion: @escaping (Bool) -> Void) {
+        withWriteAccess { granted in
+            guard granted, let event = self.store.event(withIdentifier: id) else {
+                completion(false); return
+            }
+            event.title = title
+            event.startDate = start
+            event.endDate = EventDraft.end(start: start, durationMinutes: durationMinutes)
+            do {
+                try self.store.save(event, span: .thisEvent)
+                // Refresh now rather than waiting for the .EKEventStoreChanged
+                // observer, so a newly imminent event shows up immediately.
+                self.refresh()
+                completion(true)
+            } catch {
+                completion(false)
+            }
+        }
+    }
+
+    /// Ensures calendar access (requesting lazily), then runs `work` on the main thread.
+    private func withWriteAccess(_ work: @escaping (Bool) -> Void) {
+        if hasAccess {
+            DispatchQueue.main.async { work(true) }
+        } else {
+            requestAccess { granted in work(granted) }  // requestAccess already calls back on main
+        }
     }
 }
