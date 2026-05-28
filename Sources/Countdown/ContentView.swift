@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @StateObject private var store = CountdownStore.shared
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var eventService = EventKitService.shared
     @State private var now = Date()
     @State private var isHovering = false
 
@@ -82,7 +83,7 @@ struct ContentView: View {
                     .padding(.vertical, 24)
             } else {
                 ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
-                    CountdownRow(item: item, now: now)
+                    CountdownRow(item: item, now: now, nextEvent: eventService.nextEvent)
                     if index < store.items.count - 1 {
                         Rectangle()
                             .fill(Color.bloombergOrange.opacity(0.12))
@@ -148,6 +149,7 @@ struct ResizeHandle: View {
 struct CountdownRow: View {
     let item: Countdown
     let now: Date
+    var nextEvent: EventInfo?
     @State private var justCopied = false
 
     private var accent: Color { item.color.swiftUIColor }
@@ -164,7 +166,13 @@ struct CountdownRow: View {
         }
     }
 
-    private var target: Date { item.currentTarget(now: now) }
+    private var resolved: ResolvedTarget {
+        CountdownTarget.resolve(item, now: now,
+                                nextEventStart: nextEvent?.startDate,
+                                nextEventTitle: nextEvent?.title)
+    }
+    private var target: Date { resolved.date }
+    private var displayLabel: String { resolved.title ?? item.label }
 
     private var remaining: (d: Int, h: Int, m: Int, s: Int, expired: Bool) {
         let interval = target.timeIntervalSince(now)
@@ -180,22 +188,15 @@ struct CountdownRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(item.label.uppercased())
+                Text(displayLabel.uppercased())
                     .font(.nhg(14, .medium))
                     .foregroundColor(accent)
                     .tracking(3)
 
                 if item.mode == .daily {
-                    Text("DAILY")
-                        .font(.nhg(10, .bold))
-                        .tracking(1)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(accent.opacity(0.15))
-                        )
-                        .foregroundColor(accent)
+                    badge("DAILY")
+                } else if item.mode == .nextEvent {
+                    badge(resolved.title != nil ? "NEXT" : "EOD")
                 }
                 Spacer()
             }
@@ -248,6 +249,16 @@ struct CountdownRow: View {
         }
     }
 
+    private func badge(_ text: String) -> some View {
+        Text(text)
+            .font(.nhg(10, .bold))
+            .tracking(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 3).fill(accent.opacity(0.15)))
+            .foregroundColor(accent)
+    }
+
     private var timeDisplay: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             if remaining.d > 0 {
@@ -291,7 +302,10 @@ struct HUDView: View {
     private var colonVisible: Bool { Int(now.timeIntervalSince1970) % 2 == 0 }
 
     private func remaining(for item: Countdown) -> (d: Int, h: Int, m: Int, s: Int, expired: Bool) {
-        let interval = item.currentTarget(now: now).timeIntervalSince(now)
+        let target = CountdownTarget.resolve(item, now: now,
+                                             nextEventStart: EventKitService.shared.nextEvent?.startDate,
+                                             nextEventTitle: EventKitService.shared.nextEvent?.title).date
+        let interval = target.timeIntervalSince(now)
         if interval <= 0 { return (0, 0, 0, 0, true) }
         let total = Int(interval)
         return (total / 86400, (total % 86400) / 3600, (total % 3600) / 60, total % 60, false)
@@ -309,7 +323,7 @@ struct HUDView: View {
         ZStack(alignment: .leading) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 if let item = primary {
-                    Text(item.label.uppercased())
+                    Text(hudLabel(for: item).uppercased())
                         .font(.nhg(12, .medium))
                         .foregroundColor(item.color.swiftUIColor)
                         .tracking(2)
@@ -367,9 +381,17 @@ struct HUDView: View {
         }
     }
 
+    private func hudLabel(for item: Countdown) -> String {
+        CountdownTarget.resolve(item, now: now,
+                                nextEventStart: EventKitService.shared.nextEvent?.startDate,
+                                nextEventTitle: EventKitService.shared.nextEvent?.title).title ?? item.label
+    }
+
     @ViewBuilder
     private func timeBody(for item: Countdown) -> some View {
-        let target = item.currentTarget(now: now)
+        let target = CountdownTarget.resolve(item, now: now,
+                                             nextEventStart: EventKitService.shared.nextEvent?.startDate,
+                                             nextEventTitle: EventKitService.shared.nextEvent?.title).date
         let interval = target.timeIntervalSince(now)
         if interval <= 0 {
             Text(item.mode == .daily ? "WAITING" : "00:00:00")
@@ -481,6 +503,16 @@ struct CountdownEditor: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .onChange(of: item.mode) { newMode in
+                if newMode == .nextEvent && !EventKitService.shared.hasAccess {
+                    EventKitService.shared.requestAccess { _ in }
+                }
+            }
+
+            if item.mode == .nextEvent {
+                nextEventControls
+            }
+            alertControls
 
             HStack(spacing: 8) {
                 Text("COLOR")
@@ -557,6 +589,62 @@ struct CountdownEditor: View {
                 )
         )
     }
+
+    @ViewBuilder private var nextEventControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !EventKitService.shared.hasAccess {
+                Text("Calendar access denied — enable in System Settings ▸ Privacy ▸ Calendars")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            } else if let ev = EventKitService.shared.nextEvent {
+                Text("Next: \(ev.title) · \(Self.timeFmt.string(from: ev.startDate))")
+                    .font(.system(size: 11, weight: .medium))
+            } else {
+                Text("No upcoming event — showing EOD")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Stepper("Imminent within \(item.eventLookaheadHours)h",
+                    value: $item.eventLookaheadHours, in: 1...72)
+                .font(.system(size: 11))
+        }
+    }
+
+    @ViewBuilder private var alertControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ALERTS")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary).tracking(1)
+            HStack(spacing: 6) {
+                ForEach([15, 10, 5, 1], id: \.self) { m in
+                    let on = item.alertOffsets.contains(m)
+                    Button("\(m)m") { toggleOffset(m) }
+                        .buttonStyle(.bordered)
+                        .tint(on ? .accentColor : .secondary)
+                }
+                Spacer()
+            }
+            Toggle("Notify at zero", isOn: $item.alertAtZero)
+                .font(.system(size: 11))
+                .onChange(of: item.alertAtZero) { on in if on { requestNotifAuthIfNeeded() } }
+        }
+    }
+
+    private func toggleOffset(_ m: Int) {
+        if let idx = item.alertOffsets.firstIndex(of: m) {
+            item.alertOffsets.remove(at: idx)
+        } else {
+            item.alertOffsets.append(m)
+            item.alertOffsets.sort(by: >)
+            requestNotifAuthIfNeeded()
+        }
+    }
+
+    private func requestNotifAuthIfNeeded() {
+        NotificationScheduler.shared.requestAuthorization { _ in }
+    }
+
+    private static let timeFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE h:mm a"; return f
+    }()
 
     private func hmBinding(_ hourPath: WritableKeyPath<Countdown, Int>, _ minutePath: WritableKeyPath<Countdown, Int>) -> Binding<Date> {
         Binding(

@@ -139,7 +139,7 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
             f.dateFormat = "EEE MMM d · h:mm a"
             return f.string(from: date).lowercased()
         case .nextEvent:
-            return "next calendar event"
+            return "next event · fallback EOD \(formatHM(targetHour, targetMinute))"
         }
     }
 }

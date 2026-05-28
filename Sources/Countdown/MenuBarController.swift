@@ -63,9 +63,12 @@ final class MenuBarController {
             return
         }
         let now = Date()
-        let target = primary.currentTarget(now: now)
+        let resolved = CountdownTarget.resolve(primary, now: now,
+                                               nextEventStart: EventKitService.shared.nextEvent?.startDate,
+                                               nextEventTitle: EventKitService.shared.nextEvent?.title)
+        let target = resolved.date
         let interval = target.timeIntervalSince(now)
-        let label = primary.label.uppercased()
+        let label = (resolved.title ?? primary.label).uppercased()
         let body: String
         if interval <= 0 {
             body = primary.mode == .daily ? "WAITING" : "00:00:00"
