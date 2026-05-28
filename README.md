@@ -2,6 +2,8 @@
 
 A minimal, always-on-top macOS countdown widget styled like a Bloomberg Terminal — big monospaced digits in terminal orange on black. It floats above other windows, joins all Spaces, and remembers exactly where you put it.
 
+![Countdown widget in daily mode](docs/screenshot.png)
+
 Two countdown modes:
 
 - **Daily** — counts down to a target time each day (e.g. end of day, `9:00 am → 5:30 pm`), then waits for the next reset.
