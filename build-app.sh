@@ -54,6 +54,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <true/>
     <key>ATSApplicationFontsPath</key>
     <string>Fonts</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Countdown uses your location to compute today's sunset time.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>Countdown shows the time remaining until your next calendar event.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
