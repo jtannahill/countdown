@@ -205,7 +205,12 @@ struct CountdownRow: View {
 
             ZStack(alignment: .topLeading) {
                 Group {
-                    if remaining.expired {
+                    if sunsetNeedsLocation {
+                        // No coordinates yet — show a placeholder, not a frozen 00:00:00.
+                        Text("—")
+                            .font(.nhg(56, .bold))
+                            .foregroundColor(accentDim)
+                    } else if remaining.expired {
                         Text(item.mode == .daily ? "WAITING" : "00:00:00")
                             .font(.nhg(56, .bold))
                             .foregroundColor(accentDim)
