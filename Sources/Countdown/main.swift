@@ -68,7 +68,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
-        window.contentView = NSHostingView(rootView: content)
+        let hosting = NSHostingView(rootView: content)
+        // Don't let SwiftUI's fitting size drive the window — WindowSizer owns the
+        // frame (otherwise the hosting view snaps the window back after refitHeight).
+        hosting.sizingOptions = []
+        window.contentView = hosting
         WindowSizer.shared.window = window
 
         if let frameStr = UserDefaults.standard.string(forKey: "windowFrame") {

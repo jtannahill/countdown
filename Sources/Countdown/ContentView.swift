@@ -39,8 +39,13 @@ struct ContentView: View {
                     .frame(width: baseWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .background(
+                        // Push the measured content height straight to WindowSizer.
+                        // (A PreferenceKey didn't propagate reliably across the
+                        // scaleEffect + outer GeometryReader.)
                         GeometryReader { gp in
-                            Color.clear.preference(key: ContentSizeKey.self, value: gp.size)
+                            Color.clear
+                                .onAppear { WindowSizer.shared.updateNaturalContentHeight(gp.size.height) }
+                                .onChange(of: gp.size) { WindowSizer.shared.updateNaturalContentHeight($0.height) }
                         }
                     )
 
@@ -67,9 +72,6 @@ struct ContentView: View {
         }
         .background(Color.black)
         .onReceive(timer) { now = $0 }
-        .onPreferenceChange(ContentSizeKey.self) { size in
-            WindowSizer.shared.updateNaturalContentHeight(size.height)
-        }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) { isHovering = hovering }
         }

@@ -231,13 +231,6 @@ extension Calendar {
     }
 }
 
-struct ContentSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
-    }
-}
-
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
@@ -305,6 +298,8 @@ final class WindowSizer: ObservableObject {
         let newOriginY = f.origin.y + f.size.height - newHeight   // keep top edge fixed
         w.setFrame(NSRect(x: f.origin.x, y: newOriginY, width: width, height: newHeight),
                    display: true, animate: false)
+        // Programmatic setFrame doesn't fire our didResize observer, so persist here.
+        UserDefaults.standard.set(NSStringFromRect(w.frame), forKey: "windowFrame")
     }
 
     /// Constrain interactive edge/corner dragging: lock the aspect ratio to the
