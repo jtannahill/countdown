@@ -120,20 +120,29 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
             return Date(timeIntervalSince1970: targetTimestamp)
         case .daily, .nextEvent:
             // .nextEvent uses this only as its EOD fallback; the live event
-            // target is resolved by CountdownTarget (see Task 2 onward).
-            let cal = Calendar.current
-            var anchorComps = cal.dateComponents([.year, .month, .day], from: now)
-            anchorComps.hour = resetHour
-            anchorComps.minute = resetMinute
-            anchorComps.second = 0
-            let todayReset = cal.date(from: anchorComps) ?? now
-            let anchor = todayReset <= now ? todayReset : (cal.date(byAdding: .day, value: -1, to: todayReset) ?? todayReset)
-            var targetComps = cal.dateComponents([.year, .month, .day], from: anchor)
-            targetComps.hour = targetHour
-            targetComps.minute = targetMinute
-            targetComps.second = 0
-            return cal.date(from: targetComps) ?? now
+            // target is resolved by CountdownTarget.
+            return dailyWindow(now: now)?.target ?? now
         }
+    }
+
+    /// The daily reset→target window for daily / next-event modes (nil for .fixed).
+    /// `reset` is the most recent reset time at or before `now`; `target` is the
+    /// target time on that same anchor day.
+    func dailyWindow(now: Date = Date()) -> (reset: Date, target: Date)? {
+        guard mode != .fixed else { return nil }
+        let cal = Calendar.current
+        var anchorComps = cal.dateComponents([.year, .month, .day], from: now)
+        anchorComps.hour = resetHour
+        anchorComps.minute = resetMinute
+        anchorComps.second = 0
+        let todayReset = cal.date(from: anchorComps) ?? now
+        let reset = todayReset <= now ? todayReset : (cal.date(byAdding: .day, value: -1, to: todayReset) ?? todayReset)
+        var targetComps = cal.dateComponents([.year, .month, .day], from: reset)
+        targetComps.hour = targetHour
+        targetComps.minute = targetMinute
+        targetComps.second = 0
+        let target = cal.date(from: targetComps) ?? now
+        return (reset, target)
     }
 
     var subtitle: String {
