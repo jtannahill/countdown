@@ -433,19 +433,19 @@ struct SettingsView: View {
                 Button { store.add() } label: { Label("Add", systemImage: "plus") }
             }
 
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach($store.items) { $item in
-                        CountdownEditor(item: $item, onDelete: { store.remove(id: item.id) })
-                    }
-                    if store.items.isEmpty {
-                        Text("No countdowns. Tap Add to create one.")
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 20)
-                    }
+            // Plain VStack (not a ScrollView): in a content-sized window a ScrollView
+            // with only a maxHeight collapses to zero, hiding the editors. The window
+            // grows to fit the editors instead.
+            VStack(spacing: 10) {
+                ForEach($store.items) { $item in
+                    CountdownEditor(item: $item, onDelete: { store.remove(id: item.id) })
+                }
+                if store.items.isEmpty {
+                    Text("No countdowns. Tap Add to create one.")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 20)
                 }
             }
-            .frame(maxHeight: 360)
 
             Divider()
 
@@ -475,14 +475,23 @@ struct SettingsView: View {
 struct CountdownEditor: View {
     @Binding var item: Countdown
     let onDelete: () -> Void
+    // Local mirror of the label so the TextField's editing session survives the
+    // store's per-keystroke re-render (binding directly into the @Published array
+    // dropped edits on non-first rows).
+    @State private var labelText: String = ""
     @State private var calendarNote: String?
     @State private var isAddingEvent = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                TextField("Label", text: $item.label)
+                TextField("Label", text: $labelText)
                     .textFieldStyle(.roundedBorder)
+                    .onChange(of: labelText) { newValue in
+                        if item.label != newValue { item.label = newValue }
+                    }
+                    .onAppear { labelText = item.label }
+                    .onChange(of: item.id) { _ in labelText = item.label }
                 Button(role: .destructive) { onDelete() } label: {
                     Image(systemName: "trash")
                 }

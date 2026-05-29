@@ -9,3 +9,6 @@ Resources/Fonts/*.otf
 
 # macOS
 .DS_Store
+
+# Visual brainstorming artifacts
+.superpowers/

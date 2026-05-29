@@ -14,6 +14,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func show() {
+        // The app normally runs as .accessory (no Dock icon), but an accessory app's
+        // windows don't reliably accept keyboard focus — text fields become uneditable.
+        // Become a regular foreground app while Settings is open, then revert on close.
+        NSApp.setActivationPolicy(.regular)
         if let w = window {
             NSApp.activate(ignoringOtherApps: true)
             w.makeKeyAndOrderFront(nil)
@@ -35,6 +39,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
+        // Revert to the menu-bar/agent (no Dock icon) mode.
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
