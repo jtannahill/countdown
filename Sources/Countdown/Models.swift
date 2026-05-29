@@ -270,6 +270,9 @@ final class WindowSizer: ObservableObject {
     /// the window from content layout. Explicit user actions still resize.
     var honorSavedFrame = false
 
+    let minScale: CGFloat = 0.4
+    let maxScale: CGFloat = 3.0
+
     var baseWidth: CGFloat {
         AppSettings.shared.hudMode ? 380 : 520
     }
@@ -287,20 +290,35 @@ final class WindowSizer: ObservableObject {
     func updateNaturalContentHeight(_ h: CGFloat) {
         guard h > 1, abs(h - naturalContentHeight) > 0.5 else { return }
         naturalContentHeight = h
+        // Keep the edge-resize constraints matched to the current content shape.
+        applyResizeConstraints()
         // Pinned to a restored frame: record height for scale math, but don't
         // override the user's saved position/size on launch.
         if honorSavedFrame { return }
         applySize()
     }
 
-    func setUserScale(_ scale: CGFloat) {
-        let clamped = max(0.4, min(3.0, scale))
-        UserDefaults.standard.set(Double(clamped), forKey: scaleKey)
-        applySize()
+    /// Constrain interactive edge/corner dragging: lock the aspect ratio to the
+    /// content's natural shape (so content always fills — no black void) and clamp
+    /// the size to the scale bounds.
+    func applyResizeConstraints() {
+        guard let w = window else { return }
+        w.aspectRatio = NSSize(width: baseWidth, height: naturalContentHeight)
+        w.minSize = NSSize(width: baseWidth * minScale, height: naturalContentHeight * minScale)
+        w.maxSize = NSSize(width: baseWidth * maxScale, height: naturalContentHeight * maxScale)
+    }
+
+    /// After a user drag-resize, record the resulting scale so the HUD/full toggle
+    /// (which goes through applySize) stays consistent with the dragged size.
+    func syncScaleFromFrame() {
+        guard let w = window else { return }
+        let scale = max(minScale, min(maxScale, w.frame.size.width / baseWidth))
+        UserDefaults.standard.set(Double(scale), forKey: scaleKey)
     }
 
     func applySize() {
         guard let w = window else { return }
+        applyResizeConstraints()
         let scale = userScale
         let newWidth = baseWidth * scale
         let newHeight = naturalContentHeight * scale

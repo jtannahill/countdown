@@ -53,12 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let content = ContentView()
 
-        // No .resizable: OS edge-dragging would stretch the window independently
-        // of its content, leaving a black void. Resizing is done only via the
-        // in-app handle (WindowSizer.setUserScale), which scales content to fit.
+        // .resizable enables edge/corner drag-to-resize. WindowSizer pins the
+        // window's aspectRatio to the content shape so dragging scales both
+        // dimensions together and the content always fills (no black void).
         window = FloatingWindow(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 190),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -79,12 +79,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let f = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: f.maxX - 420, y: f.maxY - 230))
         }
+        WindowSizer.shared.applyResizeConstraints()
         window.makeKeyAndOrderFront(nil)
 
         let nc = NotificationCenter.default
         let save = { [weak self] (_: Notification) in
             guard let w = self?.window else { return }
             UserDefaults.standard.set(NSStringFromRect(w.frame), forKey: "windowFrame")
+            // Keep userScale aligned with a drag-resized frame (no-op for moves).
+            WindowSizer.shared.syncScaleFromFrame()
         }
         nc.addObserver(forName: NSWindow.didMoveNotification, object: window, queue: .main, using: save)
         nc.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main, using: save)

@@ -63,13 +63,6 @@ struct ContentView: View {
                 }
                 .frame(width: baseWidth, alignment: .topLeading)
                 .scaleEffect(scale, anchor: .topLeading)
-
-                if isHovering {
-                    ResizeHandle()
-                        .padding(8)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .transition(.opacity)
-                }
             }
         }
         .background(Color.black)
@@ -117,41 +110,6 @@ struct ContentView: View {
                 )
         }
         .buttonStyle(.plain)
-    }
-}
-
-struct ResizeHandle: View {
-    @State private var startScale: CGFloat?
-    @State private var hovering = false
-
-    var body: some View {
-        Image(systemName: "arrow.up.left.and.arrow.down.right")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundColor(.bloombergOrange.opacity(hovering ? 0.9 : 0.45))
-            .frame(width: 22, height: 22)
-            .background(
-                Circle().fill(Color.bloombergOrange.opacity(hovering ? 0.18 : 0.08))
-            )
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .gesture(
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        if startScale == nil {
-                            startScale = WindowSizer.shared.userScale
-                        }
-                        let base = WindowSizer.shared.baseWidth
-                        let delta = (value.translation.width + value.translation.height) / 2
-                        let newScale = (startScale ?? 1.0) + delta / base
-                        WindowSizer.shared.setUserScale(newScale)
-                    }
-                    .onEnded { _ in
-                        startScale = nil
-                        if let w = WindowSizer.shared.window {
-                            UserDefaults.standard.set(NSStringFromRect(w.frame), forKey: "windowFrame")
-                        }
-                    }
-            )
     }
 }
 
