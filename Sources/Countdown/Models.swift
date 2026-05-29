@@ -265,7 +265,7 @@ final class WindowSizer: ObservableObject {
     static let shared = WindowSizer()
     weak var window: NSWindow?
 
-    let minScale: CGFloat = 0.4
+    let minScale: CGFloat = 0.5
     let maxScale: CGFloat = 3.0
 
     var baseWidth: CGFloat {
@@ -313,8 +313,28 @@ final class WindowSizer: ObservableObject {
     func applyResizeConstraints() {
         guard let w = window else { return }
         w.aspectRatio = NSSize(width: baseWidth, height: naturalContentHeight)
-        w.minSize = NSSize(width: baseWidth * minScale, height: naturalContentHeight * minScale)
-        w.maxSize = NSSize(width: baseWidth * maxScale, height: naturalContentHeight * maxScale)
+        let minSize = NSSize(width: baseWidth * minScale, height: naturalContentHeight * minScale)
+        let maxSize = NSSize(width: baseWidth * maxScale, height: naturalContentHeight * maxScale)
+        w.minSize = minSize
+        w.maxSize = maxSize
+        // Borderless windows can ignore minSize during a live edge-drag, so also pin
+        // the content min/max — this is what keeps the widget from vanishing.
+        w.contentMinSize = minSize
+        w.contentMaxSize = maxSize
+    }
+
+    /// Hard backstop: if a resize ever undershoots the minimum (a borderless quirk),
+    /// snap the window back up to it, keeping the top-left corner fixed.
+    func enforceMinimumSize() {
+        guard let w = window else { return }
+        let minW = baseWidth * minScale
+        let minH = naturalContentHeight * minScale
+        let f = w.frame
+        guard f.size.width < minW - 0.5 || f.size.height < minH - 0.5 else { return }
+        let newW = max(f.size.width, minW)
+        let newH = max(f.size.height, minH)
+        let newFrame = NSRect(x: f.origin.x, y: f.origin.y + f.size.height - newH, width: newW, height: newH)
+        w.setFrame(newFrame, display: true, animate: false)
     }
 
     /// After a user drag-resize, record the resulting scale so the HUD/full toggle

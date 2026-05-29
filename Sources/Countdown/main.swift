@@ -84,6 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let nc = NotificationCenter.default
         let save = { [weak self] (_: Notification) in
             guard let w = self?.window else { return }
+            // Never let a drag shrink the widget below its minimum (borderless backstop).
+            WindowSizer.shared.enforceMinimumSize()
             UserDefaults.standard.set(NSStringFromRect(w.frame), forKey: "windowFrame")
             // Keep userScale aligned with a drag-resized frame (no-op for moves).
             WindowSizer.shared.syncScaleFromFrame()
