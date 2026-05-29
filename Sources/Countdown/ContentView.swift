@@ -146,6 +146,14 @@ struct CountdownRow: View {
     private var target: Date { resolved.date }
     private var displayLabel: String { resolved.title ?? item.label }
 
+    /// Daily-window progress for the ring, or nil when it shouldn't show
+    /// (fixed mode, an active next-event, or outside the reset→target window).
+    private var ringFraction: Double? {
+        guard item.mode != .fixed, resolved.title == nil,
+              let win = item.dailyWindow(now: now) else { return nil }
+        return DailyProgress.fraction(now: now, reset: win.reset, target: win.target)
+    }
+
     private var remaining: (d: Int, h: Int, m: Int, s: Int, expired: Bool) {
         let interval = target.timeIntervalSince(now)
         if interval <= 0 { return (0, 0, 0, 0, true) }
@@ -207,6 +215,12 @@ struct CountdownRow: View {
                 .tracking(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .topTrailing) {
+            if let f = ringFraction {
+                ProgressRing(fraction: f, color: accent)
+                    .frame(width: 18, height: 18)
+            }
+        }
         .contextMenu {
             Button("Copy time (\(timeString))") { copy(timeString) }
             Button("Copy label + time") { copy("\(item.label.uppercased()) \(timeString)") }
