@@ -13,7 +13,8 @@ enum CountdownTarget {
     static func resolve(_ countdown: Countdown,
                         now: Date,
                         nextEventStart: Date?,
-                        nextEventTitle: String?) -> ResolvedTarget {
+                        nextEventTitle: String?,
+                        sunsetTarget: Date? = nil) -> ResolvedTarget {
         if countdown.mode == .nextEvent,
            let start = nextEventStart,
            start > now {
@@ -22,7 +23,10 @@ enum CountdownTarget {
                 return ResolvedTarget(date: start, title: nextEventTitle)
             }
         }
-        // daily, fixed, or next-event fallback to EOD
+        if countdown.mode == .sunset, let s = sunsetTarget {
+            return ResolvedTarget(date: s, title: nil)
+        }
+        // daily, fixed, next-event EOD fallback, or sunset-with-no-location
         return ResolvedTarget(date: countdown.currentTarget(now: now), title: nil)
     }
 }

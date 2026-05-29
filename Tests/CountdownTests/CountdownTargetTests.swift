@@ -45,4 +45,28 @@ final class CountdownTargetTests: XCTestCase {
         XCTAssertEqual(r.date, c.currentTarget(now: now))
         XCTAssertNil(r.title)
     }
+
+    func testSunsetModeUsesSunsetTarget() {
+        var c = Countdown(label: "Sunset"); c.mode = .sunset
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let sunset = now.addingTimeInterval(7200)
+        let r = CountdownTarget.resolve(c, now: now, nextEventStart: nil, nextEventTitle: nil, sunsetTarget: sunset)
+        XCTAssertEqual(r.date, sunset)
+        XCTAssertNil(r.title)
+    }
+
+    func testSunsetModeNoTargetFallsBackToCurrentTarget() {
+        var c = Countdown(label: "Sunset"); c.mode = .sunset
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let r = CountdownTarget.resolve(c, now: now, nextEventStart: nil, nextEventTitle: nil, sunsetTarget: nil)
+        XCTAssertEqual(r.date, c.currentTarget(now: now))
+        XCTAssertNil(r.title)
+    }
+
+    func testSunsetDoesNotAffectDailyResolution() {
+        let c = Countdown(label: "EOD")
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let r = CountdownTarget.resolve(c, now: now, nextEventStart: nil, nextEventTitle: nil, sunsetTarget: now.addingTimeInterval(99))
+        XCTAssertEqual(r.date, c.currentTarget(now: now))
+    }
 }

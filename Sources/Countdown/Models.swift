@@ -49,12 +49,14 @@ enum CountdownMode: String, Codable, CaseIterable, Identifiable {
     case daily
     case fixed
     case nextEvent
+    case sunset
     var id: String { rawValue }
     var label: String {
         switch self {
         case .daily: return "Daily"
         case .fixed: return "Fixed date"
         case .nextEvent: return "Next event"
+        case .sunset: return "Sunset"
         }
     }
 }
@@ -122,6 +124,9 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
             // .nextEvent uses this only as its EOD fallback; the live event
             // target is resolved by CountdownTarget.
             return dailyWindow(now: now)?.target ?? now
+        case .sunset:
+            // No location here — the real sunset target is supplied to the resolver.
+            return now
         }
     }
 
@@ -129,7 +134,7 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
     /// `reset` is the most recent reset time at or before `now`; `target` is the
     /// target time on that same anchor day.
     func dailyWindow(now: Date = Date()) -> (reset: Date, target: Date)? {
-        guard mode != .fixed else { return nil }
+        guard mode == .daily || mode == .nextEvent else { return nil }
         let cal = Calendar.current
         var anchorComps = cal.dateComponents([.year, .month, .day], from: now)
         anchorComps.hour = resetHour
@@ -156,6 +161,8 @@ struct Countdown: Codable, Identifiable, Equatable, Hashable {
             return f.string(from: date).lowercased()
         case .nextEvent:
             return "next event · fallback EOD \(formatHM(targetHour, targetMinute))"
+        case .sunset:
+            return "sunset"
         }
     }
 }
