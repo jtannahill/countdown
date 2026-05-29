@@ -14,6 +14,7 @@ struct ContentView: View {
     @StateObject private var store = CountdownStore.shared
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var eventService = EventKitService.shared
+    @ObservedObject private var locationProvider = LocationProvider.shared
     @State private var now = Date()
     @State private var isHovering = false
 
@@ -141,10 +142,29 @@ struct CountdownRow: View {
     private var resolved: ResolvedTarget {
         CountdownTarget.resolve(item, now: now,
                                 nextEventStart: nextEvent?.startDate,
-                                nextEventTitle: nextEvent?.title)
+                                nextEventTitle: nextEvent?.title,
+                                sunsetTarget: sunsetTarget)
     }
     private var target: Date { resolved.date }
     private var displayLabel: String { resolved.title ?? item.label }
+
+    private var sunsetTarget: Date? {
+        guard item.mode == .sunset, let c = LocationProvider.shared.coordinate else { return nil }
+        return SolarCalc.nextSunset(after: now, latitude: c.latitude, longitude: c.longitude)
+    }
+    private var sunsetNeedsLocation: Bool { item.mode == .sunset && sunsetTarget == nil }
+
+    private static let sunsetFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "'sunset ·' h:mm a"; return f
+    }()
+
+    private var rowSubtitle: String {
+        if item.mode == .sunset {
+            guard !sunsetNeedsLocation else { return "set location in settings" }
+            return Self.sunsetFmt.string(from: resolved.date).lowercased()
+        }
+        return item.subtitle
+    }
 
     /// Daily-window progress for the ring, or nil when it shouldn't show
     /// (fixed mode, an active next-event, or outside the reset→target window).
@@ -177,6 +197,8 @@ struct CountdownRow: View {
                     badge("DAILY")
                 } else if item.mode == .nextEvent {
                     badge(resolved.title != nil ? "NEXT" : "EOD")
+                } else if item.mode == .sunset {
+                    badge("SUNSET")
                 }
                 Spacer()
             }
@@ -209,7 +231,7 @@ struct CountdownRow: View {
                 }
             }
 
-            Text(item.subtitle)
+            Text(rowSubtitle)
                 .font(.nhg(12, .medium))
                 .foregroundColor(accentFaint)
                 .tracking(1)
@@ -287,10 +309,16 @@ struct HUDView: View {
     private var primary: Countdown? { store.items.first }
     private var colonVisible: Bool { Int(now.timeIntervalSince1970) % 2 == 0 }
 
+    private func sunsetTarget(for item: Countdown) -> Date? {
+        guard item.mode == .sunset, let c = LocationProvider.shared.coordinate else { return nil }
+        return SolarCalc.nextSunset(after: now, latitude: c.latitude, longitude: c.longitude)
+    }
+
     private func remaining(for item: Countdown) -> (d: Int, h: Int, m: Int, s: Int, expired: Bool) {
         let target = CountdownTarget.resolve(item, now: now,
                                              nextEventStart: EventKitService.shared.nextEvent?.startDate,
-                                             nextEventTitle: EventKitService.shared.nextEvent?.title).date
+                                             nextEventTitle: EventKitService.shared.nextEvent?.title,
+                                             sunsetTarget: sunsetTarget(for: item)).date
         let interval = target.timeIntervalSince(now)
         if interval <= 0 { return (0, 0, 0, 0, true) }
         let total = Int(interval)
@@ -370,14 +398,16 @@ struct HUDView: View {
     private func hudLabel(for item: Countdown) -> String {
         CountdownTarget.resolve(item, now: now,
                                 nextEventStart: EventKitService.shared.nextEvent?.startDate,
-                                nextEventTitle: EventKitService.shared.nextEvent?.title).title ?? item.label
+                                nextEventTitle: EventKitService.shared.nextEvent?.title,
+                                sunsetTarget: sunsetTarget(for: item)).title ?? item.label
     }
 
     @ViewBuilder
     private func timeBody(for item: Countdown) -> some View {
         let target = CountdownTarget.resolve(item, now: now,
                                              nextEventStart: EventKitService.shared.nextEvent?.startDate,
-                                             nextEventTitle: EventKitService.shared.nextEvent?.title).date
+                                             nextEventTitle: EventKitService.shared.nextEvent?.title,
+                                             sunsetTarget: sunsetTarget(for: item)).date
         let interval = target.timeIntervalSince(now)
         if interval <= 0 {
             Text(item.mode == .daily ? "WAITING" : "00:00:00")

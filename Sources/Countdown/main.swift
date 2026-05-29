@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     private func rescheduleNotifications() {
+        // Sunset-mode alerts are deferred: AlertPlanner resolves without a sunset
+        // target, so sunset countdowns simply schedule no notifications for now.
         let svc = EventKitService.shared
         NotificationScheduler.shared.reschedule(
             items: CountdownStore.shared.items,

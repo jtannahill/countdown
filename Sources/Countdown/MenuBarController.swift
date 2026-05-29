@@ -63,9 +63,11 @@ final class MenuBarController {
             return
         }
         let now = Date()
+        let sunset = (primary.mode == .sunset) ? LocationProvider.shared.coordinate.flatMap { SolarCalc.nextSunset(after: now, latitude: $0.latitude, longitude: $0.longitude) } : nil
         let resolved = CountdownTarget.resolve(primary, now: now,
                                                nextEventStart: EventKitService.shared.nextEvent?.startDate,
-                                               nextEventTitle: EventKitService.shared.nextEvent?.title)
+                                               nextEventTitle: EventKitService.shared.nextEvent?.title,
+                                               sunsetTarget: sunset)
         let target = resolved.date
         let interval = target.timeIntervalSince(now)
         let label = (resolved.title ?? primary.label).uppercased()
