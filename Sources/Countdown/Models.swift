@@ -34,7 +34,7 @@ enum TerminalColor: String, Codable, CaseIterable, Identifiable {
         case .orange: return Color(red: 0xFE/255.0, green: 0x96/255.0, blue: 0x24/255.0)
         case .amber:  return Color(red: 0xFF/255.0, green: 0xB3/255.0, blue: 0x00/255.0)
         case .cyan:   return Color(red: 0x49/255.0, green: 0xD7/255.0, blue: 0xFF/255.0)
-        case .green:  return Color(red: 0x6C/255.0, green: 0xFF/255.0, blue: 0x6C/255.0)
+        case .green:  return Color(red: 0x33/255.0, green: 0xFF/255.0, blue: 0x33/255.0)  // Bloomberg green #33FF33
         case .red:    return Color(red: 0xFF/255.0, green: 0x4D/255.0, blue: 0x4D/255.0)
         case .white:  return Color(red: 0xE5/255.0, green: 0xE5/255.0, blue: 0xE5/255.0)
         }
