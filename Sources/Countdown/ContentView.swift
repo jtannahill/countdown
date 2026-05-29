@@ -508,9 +508,12 @@ struct CountdownEditor: View {
     // Local mirror of the label so the TextField's editing session survives the
     // store's per-keystroke re-render (binding directly into the @Published array
     // dropped edits on non-first rows).
+    @ObservedObject private var location = LocationProvider.shared
     @State private var labelText: String = ""
     @State private var calendarNote: String?
     @State private var isAddingEvent = false
+    @State private var manualLat: String = ""
+    @State private var manualLon: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -539,10 +542,16 @@ struct CountdownEditor: View {
                 if newMode == .nextEvent && !EventKitService.shared.hasAccess {
                     EventKitService.shared.requestAccess { _ in }
                 }
+                if newMode == .sunset {
+                    LocationProvider.shared.requestAccessIfNeeded()
+                }
             }
 
             if item.mode == .nextEvent {
                 nextEventControls
+            }
+            if item.mode == .sunset {
+                sunsetControls
             }
             alertControls
 
@@ -728,6 +737,45 @@ struct CountdownEditor: View {
             }
             isAddingEvent = false
         }
+    }
+
+    @ViewBuilder private var sunsetControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if location.coordinate != nil && !location.authorizationDenied {
+                Text("Using your location")
+                    .font(.system(size: 11, weight: .medium))
+            } else if location.authorizationDenied {
+                Text("Location denied — enter coordinates below")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            } else {
+                Text("Set your location below (or allow Location access)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                TextField("Latitude", text: $manualLat).textFieldStyle(.roundedBorder).frame(width: 90)
+                TextField("Longitude", text: $manualLon).textFieldStyle(.roundedBorder).frame(width: 90)
+                Button("Set") {
+                    if let la = Double(manualLat), let lo = Double(manualLon) {
+                        location.setManualCoordinate(latitude: la, longitude: lo)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(!manualCoordsValid)
+                Spacer()
+            }
+        }
+        .onAppear {
+            if let c = location.manualCoordinate {
+                manualLat = String(c.latitude)
+                manualLon = String(c.longitude)
+            }
+        }
+    }
+
+    /// Both fields parse to numbers AND fall within valid lat/long ranges.
+    private var manualCoordsValid: Bool {
+        guard let la = Double(manualLat), let lo = Double(manualLon) else { return false }
+        return LocationProvider.isValid(latitude: la, longitude: lo)
     }
 
     private func hmBinding(_ hourPath: WritableKeyPath<Countdown, Int>, _ minutePath: WritableKeyPath<Countdown, Int>) -> Binding<Date> {

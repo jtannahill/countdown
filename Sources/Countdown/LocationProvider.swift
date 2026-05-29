@@ -10,6 +10,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
     struct Coordinate: Equatable { let latitude: Double; let longitude: Double }
 
     @Published private(set) var coordinate: Coordinate?
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
     private let manager = CLLocationManager()
     private var liveCoordinate: Coordinate? { didSet { recompute() } }
@@ -20,6 +21,7 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        authorizationStatus = manager.authorizationStatus
         recompute()
     }
 
@@ -27,9 +29,10 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
         (-90...90).contains(latitude) && (-180...180).contains(longitude)
     }
 
+    // Reads the @Published status so SwiftUI refreshes when authorization changes
+    // even if `coordinate` stays nil (e.g. denied before any fix).
     var authorizationDenied: Bool {
-        let s = manager.authorizationStatus
-        return s == .denied || s == .restricted
+        authorizationStatus == .denied || authorizationStatus == .restricted
     }
 
     /// Lazily request authorization + a one-shot location fix. Safe to call repeatedly.
@@ -74,9 +77,13 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 
     // MARK: CLLocationManagerDelegate
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        if manager.authorizationStatus == .authorized || manager.authorizationStatus == .authorizedAlways {
-            manager.requestLocation()
+        let status = manager.authorizationStatus
+        // @Published write drives SwiftUI — keep it on the main thread.
+        let apply = {
+            self.authorizationStatus = status
+            if status == .authorized || status == .authorizedAlways { manager.requestLocation() }
         }
+        if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
         recompute()
     }
 
