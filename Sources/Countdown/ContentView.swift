@@ -95,7 +95,10 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(22)
+        .padding(.top, 22)
+        .padding(.horizontal, 22)
+        // Tighter bottom margin when a single countdown is shown.
+        .padding(.bottom, store.items.count == 1 ? 8 : 22)
     }
 
     private func iconButton(_ system: String, action: @escaping () -> Void) -> some View {

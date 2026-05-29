@@ -72,9 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WindowSizer.shared.window = window
 
         if let frameStr = UserDefaults.standard.string(forKey: "windowFrame") {
+            // Restore saved position + width; height is re-fit to content on layout.
             window.setFrame(NSRectFromString(frameStr), display: true)
-            // Pin to the saved frame so content layout doesn't drift it on launch.
-            WindowSizer.shared.honorSavedFrame = true
         } else if let screen = NSScreen.main {
             let f = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: f.maxX - 420, y: f.maxY - 230))

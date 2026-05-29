@@ -265,11 +265,6 @@ final class WindowSizer: ObservableObject {
     static let shared = WindowSizer()
     weak var window: NSWindow?
 
-    /// When a saved window frame was restored on launch, keep it pinned:
-    /// track the natural content height for scaling math but never auto-resize
-    /// the window from content layout. Explicit user actions still resize.
-    var honorSavedFrame = false
-
     let minScale: CGFloat = 0.4
     let maxScale: CGFloat = 3.0
 
@@ -290,12 +285,26 @@ final class WindowSizer: ObservableObject {
     func updateNaturalContentHeight(_ h: CGFloat) {
         guard h > 1, abs(h - naturalContentHeight) > 0.5 else { return }
         naturalContentHeight = h
-        // Keep the edge-resize constraints matched to the current content shape.
+        // Keep the edge-resize constraints matched to the current content shape,
+        // then pull the window's height to hug the content (width/position kept).
         applyResizeConstraints()
-        // Pinned to a restored frame: record height for scale math, but don't
-        // override the user's saved position/size on launch.
-        if honorSavedFrame { return }
-        applySize()
+        refitHeight()
+    }
+
+    /// Pull the window's height to hug the content at the current (user-controlled)
+    /// width, keeping the top-left corner fixed. Width and position are never changed
+    /// here — only the bottom edge moves — so this eliminates dead black space below
+    /// the content without drifting the widget.
+    func refitHeight() {
+        guard let w = window, baseWidth > 1 else { return }
+        let width = w.frame.size.width
+        guard width > 1 else { return }
+        let newHeight = width * (naturalContentHeight / baseWidth)
+        let f = w.frame
+        guard abs(newHeight - f.size.height) > 0.5 else { return }
+        let newOriginY = f.origin.y + f.size.height - newHeight   // keep top edge fixed
+        w.setFrame(NSRect(x: f.origin.x, y: newOriginY, width: width, height: newHeight),
+                   display: true, animate: false)
     }
 
     /// Constrain interactive edge/corner dragging: lock the aspect ratio to the
