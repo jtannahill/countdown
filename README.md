@@ -1,5 +1,11 @@
 # Countdown
 
+![Status](https://img.shields.io/badge/status-active-success)
+![Swift](https://img.shields.io/badge/Swift-FA7343?logo=swift&logoColor=white)
+![SwiftUI](https://img.shields.io/badge/SwiftUI-0071E3?logo=swift&logoColor=white)
+![License](https://img.shields.io/github/license/jtannahill/countdown)
+![Last Commit](https://img.shields.io/github/last-commit/jtannahill/countdown)
+
 A minimal, always-on-top macOS countdown widget styled like a Bloomberg Terminal — big monospaced digits in terminal orange on black. It floats above other windows, joins all Spaces, and remembers exactly where you put it.
 
 ![Countdown widget in daily mode](docs/screenshot.png)
